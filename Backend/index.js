@@ -1,8 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
-const axios = require("axios");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client } = require("@aws-sdk/client-s3");
 const { Upload } = require("@aws-sdk/lib-storage");
 const multer = require("multer");
 const dotenv = require("dotenv");
@@ -45,10 +44,11 @@ app.post("/api/upload-to-s3", upload.single("file"), async (req, res) => {
     const upload = new Upload({
       client: s3Client,
       params,
+      leavePartsOnError: false, // Clean up any parts if the upload fails
     });
 
-    const uploadResult = await upload.done();
-    res.json({ s3_url: uploadResult.Location });
+    await upload.done();
+    res.json({ message: "File uploaded successfully" });
   } catch (error) {
     console.error(`Error uploading file to S3: ${error.message}`);
     res.status(500).json({ error: `Failed to upload file to S3: ${error.message}` });
@@ -56,19 +56,19 @@ app.post("/api/upload-to-s3", upload.single("file"), async (req, res) => {
 });
 
 app.post("/api/get-local-file", (req, res) => {
-    const { path: filePath } = req.body;
-    if (!filePath) {
-      return res.status(400).json({ error: "File path is required" });
-    }
-    try {
-      const fileStream = fs.createReadStream(filePath.replace(/"/g, ''));
-      res.setHeader("Content-Disposition", `attachment; filename="${filePath.split('/').pop()}"`);
-      fileStream.pipe(res);
-    } catch (error) {
-      console.error(`Error reading local file: ${error.message}`);
-      res.status(500).json({ error: `Error reading local file: ${error.message}` });
-    }
-  });
+  const { path: filePath } = req.body;
+  if (!filePath) {
+    return res.status(400).json({ error: "File path is required" });
+  }
+  try {
+    const fileStream = fs.createReadStream(filePath.replace(/"/g, ''));
+    res.setHeader("Content-Disposition", `attachment; filename="${filePath.split('/').pop()}"`);
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error(`Error reading local file: ${error.message}`);
+    res.status(500).json({ error: `Error reading local file: ${error.message}` });
+  }
+});
 
 app.post("/api/ping", (req, res) => {
   res.send("Server is running");
